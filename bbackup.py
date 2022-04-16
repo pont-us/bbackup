@@ -26,6 +26,7 @@ import argparse
 import os
 import sys
 
+
 def main():
     # TODO trap SIGINT and SIGTERM like the bash script?
     # TODO run the set-ssh-auth-sock script to allow online backups
@@ -40,7 +41,7 @@ def main():
     #      just keep the one-line, one-value ssh-auth-sock in
     #      its own directory with a README explaining what it's for.
     #      Easier than e.g. using YAML for a one-value config :).
-    
+
     parser = argparse.ArgumentParser('Perform borg backups')
     parser.add_argument('--dry-run', '-d', action='store_true')
     parser.add_argument('config_dir', type=str,
@@ -58,7 +59,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     
     extra_params = ['--dry-run'] if dry_run else []
     log_file = config_dir.joinpath('logs', 'log')
-    borg_passcommand = f'secret-tool lookup borg-config {config_dir.name}'
+    borg_passcommand = 'secret-tool lookup borg-config %s' % config_dir.name
     borg_env = dict(os.environ, BORG_PASSCOMMAND=borg_passcommand)
 
     print('Starting backup to ' + borg_repo)
@@ -129,6 +130,27 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     
     # use highest exit code as global exit code
     return max(create_result.returncode, prune_result.returncode)
+
+
+def get_ssh_auth_socket(script_path: str) -> str:
+    """Get the value of SSH_AUTH_SOCK from a shell script that sets it
+
+    :param script_path: path to shell script
+    :return: value of SSH_AUTH_SOCK set by shell script
+    """
+
+    # Per the subprocess documentation, "On POSIX with shell=True, the shell
+    # defaults to /bin/sh". But even if this changes, any POSIX-compliant shell
+    # should work here.
+
+    result = subprocess.check_output(
+        # "." is the POSIX-compliant version of bash's "source".
+        # "echo -n" is not guaranteed by POSIX so we strip the newline instead.
+        ". %s; echo $SSH_AUTH_SOCK" % script_path,
+        shell=True
+    )
+
+    return result.strip().decode(sys.stdout.encoding)
 
 
 if __name__ == '__main__':

@@ -20,11 +20,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import subprocess
-import pathlib
 import argparse
 import os
+import pathlib
+import subprocess
 import sys
+
+import yaml
 
 
 def main():
@@ -55,6 +57,7 @@ def main():
 
 def do_backup(config_dir: pathlib.Path, dry_run: bool):
     exclude_file = config_dir.parent.joinpath("exclude.txt")
+    config = read_global_config(config_dir)
     with open(config_dir.joinpath("repo-path.txt"), "r") as fh:
         borg_repo = fh.readline().strip()
 
@@ -62,6 +65,12 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     log_file = config_dir.joinpath("logs", "log")
     borg_passcommand = "secret-tool lookup borg-config %s" % config_dir.name
     borg_env = dict(os.environ, BORG_PASSCOMMAND=borg_passcommand)
+    if "ssh-auth-sock-script-path" in config:
+        borg_env["SSH_AUTH_SOCK"] = get_ssh_auth_socket(
+            os.path.expandvars(
+                os.path.expanduser(config["ssh-auth-sock-script-path"])
+            )
+        )
 
     print("Starting backup to " + borg_repo)
 
@@ -136,6 +145,16 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
 
     # use highest exit code as global exit code
     return max(create_result.returncode, prune_result.returncode)
+
+
+def read_global_config(config_dir):
+    config_file = config_dir.parent.joinpath("config.yaml")
+    if os.path.isfile(config_file):
+        with open(config_file, "r") as fh:
+            config = yaml.safe_load(fh)
+        return config
+    else:
+        return {}
 
 
 def get_ssh_auth_socket(script_path: str) -> str:

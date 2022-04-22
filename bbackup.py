@@ -31,18 +31,6 @@ import yaml
 
 def main():
     # TODO trap SIGINT and SIGTERM like the bash script?
-    # TODO run the set-ssh-auth-sock script to allow online backups
-    #      with ssh-agent managing authentication. Though actually,
-    #      might have to modify this system -- in the bash script
-    #      we just source set-ssh-auth-sock, but we can't do that
-    #      in python, at least not in the same way. Might be
-    #      simplest just to write the value of the SSH_AUTH_SOCK
-    #      to a file and read that. Ideally I'd like to
-    #      write a file which can include a comment so I know what
-    #      it is when I stumble across it. But actually I can
-    #      just keep the one-line, one-value ssh-auth-sock in
-    #      its own directory with a README explaining what it's for.
-    #      Easier than e.g. using YAML for a one-value config :).
 
     parser = argparse.ArgumentParser("Perform borg backups")
     parser.add_argument("--dry-run", "-d", action="store_true")

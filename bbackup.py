@@ -25,6 +25,7 @@ import os
 import pathlib
 import subprocess
 import sys
+from typing import AnyStr
 
 import yaml
 
@@ -63,6 +64,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     print("Starting backup to " + borg_repo)
 
     with open(log_file, "w") as log_fh:
+        # TODO: use tee function here (and for other subprocess.run calls)
         create_result = subprocess.run(
             args=[
                 "borg",
@@ -164,6 +166,22 @@ def get_ssh_auth_socket(script_path: str) -> str:
     )
 
     return result.strip().decode(sys.stdout.encoding)
+
+
+def tee(subprocess_args, dest_path):
+    with subprocess.Popen(
+            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
+            **subprocess_args
+    ) as popen, open(dest_path, "ba") as fh:
+        while True:
+            # Keeping the type-checker happy is a little fiddly here. In
+            # practice we expect that this will always be of type bytes.
+            data: AnyStr = popen.stdout.read(1)
+            if data == b"":
+                break
+            sys.stdout.buffer.write(data)
+            sys.stdout.flush()
+            fh.write(data)
 
 
 if __name__ == "__main__":

@@ -63,9 +63,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
 
     print("Starting backup to " + borg_repo)
 
-    with open(log_file, "w") as log_fh:
-        # TODO: use tee function here (and for other subprocess.run calls)
-        create_result = subprocess.run(
+    with open(log_file, "bw") as log_fh:
+        create_args = dict(
             args=[
                 "borg",
                 "create",
@@ -86,16 +85,16 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
                 borg_repo + "::{hostname}-test-{now}",
                 pathlib.Path.home().as_posix(),
             ],
-            stderr=log_fh,
             env=borg_env,
         )
+        create_result = tee(create_args, log_fh)
 
         print("Pruning repository " + borg_repo)
 
         # Prune repository to 7 daily, 4 weekly and 6 monthly archives. NB: the
         # '{hostname}-' prefix limits pruning to this machine's archives.
 
-        prune_result = subprocess.run(
+        prune_args = dict(
             args=[
                 "borg",
                 "prune",
@@ -111,9 +110,9 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
             ]
             + extra_params
             + [borg_repo],
-            stderr=log_fh,
             env=borg_env,
         )
+        prune_result = tee(prune_args, log_fh)
 
     logrotate_extra_args = ["--debug"] if dry_run else []
     subprocess.run(
@@ -123,18 +122,21 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         cwd=config_dir,
     )
 
-    for r in create_result, prune_result:
-        print(dict(create="Backup", prune="Prune")[r.args[1]], end="")
+    for step, returncode in [
+        ("Backup", create_result),
+        ("Prune", prune_result),
+    ]:
+        print(step, end="")
         print(" finished ", end="")
-        if r.returncode == 0:
+        if returncode == 0:
             print("successfully")
-        elif r.returncode == 1:
+        elif returncode == 1:
             print("with warnings")
         else:
             print("with errors")
 
     # use highest exit code as global exit code
-    return max(create_result.returncode, prune_result.returncode)
+    return max(create_result, prune_result)
 
 
 def read_global_config(config_dir):
@@ -168,11 +170,10 @@ def get_ssh_auth_socket(script_path: str) -> str:
     return result.strip().decode(sys.stdout.encoding)
 
 
-def tee(subprocess_args, dest_path):
+def tee(subprocess_args: dict, fh) -> int:
     with subprocess.Popen(
-            stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-            **subprocess_args
-    ) as popen, open(dest_path, "ba") as fh:
+        stderr=subprocess.STDOUT, stdout=subprocess.PIPE, **subprocess_args
+    ) as popen:
         while True:
             # Keeping the type-checker happy is a little fiddly here. In
             # practice we expect that this will always be of type bytes.
@@ -182,6 +183,7 @@ def tee(subprocess_args, dest_path):
             sys.stdout.buffer.write(data)
             sys.stdout.flush()
             fh.write(data)
+        return popen.returncode
 
 
 if __name__ == "__main__":

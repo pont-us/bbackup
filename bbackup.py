@@ -82,7 +82,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
             ]
             + extra_params
             + [
-                borg_repo + "::{hostname}-test-{now}",
+                borg_repo + "::{hostname}-{now}",
                 pathlib.Path.home().as_posix(),
             ],
             env=borg_env,
@@ -100,7 +100,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
                 "prune",
                 "--list",
                 "--prefix",
-                "{hostname}-" "--show-rc",  # Important! (See above.)
+                "{hostname}-",  # Important! (See above.)
+                "--show-rc",
                 "--keep-daily",
                 "7",
                 "--keep-weekly",

@@ -61,16 +61,19 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
             )
         )
 
-    print("Starting backup to " + borg_repo)
-
     with open(log_file, "bw") as log_fh:
+        # NB: create_args, prune_args, and logrotate_args below contain
+        # arguments for the subprocess.Popen call, not just for the external
+        # command.
+
+        print("Starting backup to " + borg_repo)
         create_args = dict(
             args=[
                 "borg",
                 "create",
                 "--verbose",
                 "--filter",
-                "AME-x",
+                "AMEx",
                 "--list",
                 "--stats",
                 "--show-rc",
@@ -90,10 +93,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         create_result = tee(create_args, log_fh)
 
         print("Pruning repository " + borg_repo)
-
         # Prune repository to 7 daily, 4 weekly and 6 monthly archives. NB: the
         # '{hostname}-' prefix limits pruning to this machine's archives.
-
         prune_args = dict(
             args=[
                 "borg",
@@ -115,17 +116,22 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         )
         prune_result = tee(prune_args, log_fh)
 
+    print("Rotating logs")
+    # logrotate, of course, is not run through tee, since it can hardly log
+    # its output to the log that it's currently rotating.
     logrotate_extra_args = ["--debug"] if dry_run else []
-    subprocess.run(
+    logrotate_args = dict(
         args=["logrotate", "--verbose", "--state", "logrotate-state"]
         + logrotate_extra_args
         + ["logrotate.conf"],
         cwd=config_dir,
     )
+    logrotate_result = subprocess.run(**logrotate_args).returncode
 
     for step, returncode in [
         ("Backup", create_result),
         ("Prune", prune_result),
+        ("Rotate logs", logrotate_result),
     ]:
         print(step, end="")
         print(" finished ", end="")
@@ -137,7 +143,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
             print("with errors")
 
     # use highest exit code as global exit code
-    return max(create_result, prune_result)
+    return max(create_result, prune_result, logrotate_result)
 
 
 def read_global_config(config_dir):
@@ -184,6 +190,9 @@ def tee(subprocess_args: dict, fh) -> int:
             sys.stdout.buffer.write(data)
             sys.stdout.flush()
             fh.write(data)
+        # The subprocess has finished writing, but we still want to wait
+        # for it to complete and give a return code.
+        popen.wait()
         return popen.returncode
 
 

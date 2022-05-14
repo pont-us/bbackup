@@ -26,12 +26,14 @@ import pathlib
 import subprocess
 import sys
 from typing import AnyStr
+import signal
 
 import yaml
 
 
 def main():
-    # TODO trap SIGINT and SIGTERM like the bash script?
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
 
     parser = argparse.ArgumentParser("Perform borg backups")
     parser.add_argument("--dry-run", "-d", action="store_true")
@@ -42,6 +44,13 @@ def main():
     config_path = pathlib.Path(args.config_dir)
     exit_code = do_backup(config_path, args.dry_run)
     sys.exit(exit_code)
+
+
+def handle_signal(sig, stack_frame):
+    print(f"\nBackup interrupted by signal {sig} "
+          f"at line {stack_frame.f_code.co_filename}:{stack_frame.f_lineno}!\n"
+          f"Exiting.")
+    sys.exit(2)
 
 
 def do_backup(config_dir: pathlib.Path, dry_run: bool):

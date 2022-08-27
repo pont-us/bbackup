@@ -47,28 +47,35 @@ def main():
 
 
 def handle_signal(sig, stack_frame):
-    print(f"\nBackup interrupted by signal {sig} "
-          f"at line {stack_frame.f_code.co_filename}:{stack_frame.f_lineno}!\n"
-          f"Exiting.")
+    print(
+        f"\nBackup interrupted by signal {sig} "
+        f"at line {stack_frame.f_code.co_filename}:{stack_frame.f_lineno}!\n"
+        f"Exiting."
+    )
     sys.exit(2)
 
 
 def do_backup(config_dir: pathlib.Path, dry_run: bool):
     exclude_file = config_dir.parent.joinpath("exclude.txt")
-    config = read_global_config(config_dir)
-    with open(config_dir.joinpath("repo-path.txt"), "r") as fh:
-        borg_repo = fh.readline().strip()
+    global_config = read_config(config_dir.parent.joinpath("config.yaml"))
+    repo_config = read_config(config_dir.joinpath("config.yaml"))
+    borg_repo = repo_config["repo-path"]
 
     extra_params = ["--dry-run"] if dry_run else []
     log_file = config_dir.joinpath("logs", "log")
     borg_passcommand = "secret-tool lookup borg-config %s" % config_dir.name
     borg_env = dict(os.environ, BORG_PASSCOMMAND=borg_passcommand)
-    if "ssh-auth-sock-script-path" in config:
+    if "ssh-auth-sock-script-path" in global_config:
         borg_env["SSH_AUTH_SOCK"] = get_ssh_auth_socket(
             os.path.expandvars(
-                os.path.expanduser(config["ssh-auth-sock-script-path"])
+                os.path.expanduser(global_config["ssh-auth-sock-script-path"])
             )
         )
+    source_dirs = (
+        repo_config["source-directories"]
+        if "source-directories" in repo_config
+        else [pathlib.Path.home().as_posix()]
+    )
 
     with open(log_file, "bw") as log_fh:
         # NB: create_args, prune_args, and logrotate_args below contain
@@ -93,10 +100,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
                 exclude_file,
             ]
             + extra_params
-            + [
-                borg_repo + "::{hostname}-{now}",
-                pathlib.Path.home().as_posix(),
-            ],
+            + [borg_repo + "::{hostname}-{now}"]
+            + source_dirs,
             env=borg_env,
         )
         create_result = tee(create_args, log_fh)
@@ -155,7 +160,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     return max(create_result, prune_result, logrotate_result)
 
 
-def read_global_config(config_dir):
+def read_config(config_dir):
     config_file = config_dir.parent.joinpath("config.yaml")
     if os.path.isfile(config_file):
         with open(config_file, "r") as fh:

@@ -60,6 +60,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     global_config = read_config(config_dir.parent.joinpath("config.yaml"))
     repo_config = read_config(config_dir.joinpath("config.yaml"))
     borg_repo = repo_config["repo-path"]
+    borg_path = repo_config.get("borg-path", "borg")
 
     extra_params = ["--dry-run"] if dry_run else []
     log_file = config_dir.joinpath("logs", "log")
@@ -71,11 +72,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
                 os.path.expanduser(global_config["ssh-auth-sock-script-path"])
             )
         )
-    source_dirs = (
-        repo_config["source-directories"]
-        if "source-directories" in repo_config
-        else [pathlib.Path.home().as_posix()]
-    )
+    source_dirs = repo_config.get("source-directories",
+                                  [pathlib.Path.home().as_posix()])
 
     with open(log_file, "bw") as log_fh:
         # NB: create_args, prune_args, and logrotate_args below contain
@@ -85,7 +83,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         print("Starting backup to " + borg_repo)
         create_args = dict(
             args=[
-                "borg",
+                borg_path,
                 "create",
                 "--verbose",
                 "--filter",
@@ -111,7 +109,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         # '{hostname}-' prefix limits pruning to this machine's archives.
         prune_args = dict(
             args=[
-                "borg",
+                borg_path,
                 "prune",
                 "--list",
                 "--prefix",

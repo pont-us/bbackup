@@ -62,7 +62,11 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     borg_repo = repo_config["repo-path"]
     borg_path = repo_config.get("borg-path", "borg")
 
-    extra_params = ["--dry-run"] if dry_run else []
+    extra_params = (
+        ["--remote-path", repo_config["remote_path"]]
+        if "remote_path" in repo_config
+        else []
+    ) + (["--dry-run"] if dry_run else [])
     log_file = config_dir.joinpath("logs", "log")
     borg_passcommand = "secret-tool lookup borg-config %s" % config_dir.name
     borg_env = dict(os.environ, BORG_PASSCOMMAND=borg_passcommand)
@@ -72,8 +76,9 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
                 os.path.expanduser(global_config["ssh-auth-sock-script-path"])
             )
         )
-    source_dirs = repo_config.get("source-directories",
-                                  [pathlib.Path.home().as_posix()])
+    source_dirs = repo_config.get(
+        "source-directories", [pathlib.Path.home().as_posix()]
+    )
 
     with open(log_file, "bw") as log_fh:
         # NB: create_args, prune_args, and logrotate_args below contain

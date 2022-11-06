@@ -63,8 +63,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     borg_path = repo_config.get("borg-path", "borg")
 
     extra_params = (
-        ["--remote-path", repo_config["remote_path"]]
-        if "remote_path" in repo_config
+        ["--remote-path", repo_config["remote-path"]]
+        if "remote-path" in repo_config
         else []
     ) + (["--dry-run"] if dry_run else [])
     log_file = config_dir.joinpath("logs", "log")

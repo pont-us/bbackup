@@ -164,14 +164,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         ("Prune", prune_result),
         ("Rotate logs", logrotate_result),
     ]:
-        message = step + " finished "
-        if returncode == 0:
-            result = "successfully"
-        elif returncode == 1:
-            result = "with warnings"
-        else:
-            result = "with errors"
-        log(message + result)
+        log("%s finished with return code %d." % (step, returncode))
 
     # use highest exit code as global exit code
     return max(create_result, prune_result, logrotate_result)

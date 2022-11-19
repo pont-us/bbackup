@@ -55,7 +55,7 @@ def handle_signal(sig, stack_frame):
     sys.exit(2)
 
 
-def do_backup(config_dir: pathlib.Path, dry_run: bool):
+def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     exclude_file = config_dir.parent.joinpath("exclude.txt")
     global_config = read_config(config_dir.parent.joinpath("config.yaml"))
     repo_config = read_config(config_dir.joinpath("config.yaml"))
@@ -170,7 +170,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     return max(create_result, prune_result, logrotate_result)
 
 
-def read_config(config_dir):
+def read_config(config_dir: pathlib.Path) -> dict:
     config_file = config_dir.parent.joinpath("config.yaml")
     if os.path.isfile(config_file):
         with open(config_file, "r") as fh:
@@ -180,7 +180,7 @@ def read_config(config_dir):
         return {}
 
 
-def get_variable_from_shell_script(variable_name, script_path: str) -> str:
+def get_variable_from_shell_script(variable_name: str, script_path: str) -> str:
     """Get the value of SSH_AUTH_SOCK from a shell script that sets it
 
     :param variable_name: name of an environment variable set by a shell script

@@ -68,14 +68,23 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         else []
     ) + (["--dry-run"] if dry_run else [])
     log_file = config_dir.joinpath("logs", "log")
-    borg_passcommand = "secret-tool lookup borg-config %s" % config_dir.name
-    borg_env = dict(os.environ, BORG_PASSCOMMAND=borg_passcommand)
-    if "ssh-auth-sock-script-path" in global_config:
-        borg_env["SSH_AUTH_SOCK"] = get_ssh_auth_socket(
-            os.path.expandvars(
-                os.path.expanduser(global_config["ssh-auth-sock-script-path"])
+    borg_env = dict(
+        os.environ,
+        BORG_PASSCOMMAND=(
+            "secret-tool lookup borg-config %s" % config_dir.name
+        ),
+        BORG_RELOCATED_REPO_ACCESS_IS_OK="yes",
+    )
+    if "variable-setter-script-path" in global_config:
+        for variable_name in "SSH_AUTH_SOCK", "DBUS_SESSION_BUS_ADDRESS":
+            borg_env[variable_name] = get_variable_from_shell_script(
+                variable_name,
+                os.path.expandvars(
+                    os.path.expanduser(
+                        global_config["variable-setter-script-path"]
+                    )
+                ),
             )
-        )
     source_dirs = repo_config.get(
         "source-directories", [pathlib.Path.home().as_posix()]
     )
@@ -173,11 +182,12 @@ def read_config(config_dir):
         return {}
 
 
-def get_ssh_auth_socket(script_path: str) -> str:
+def get_variable_from_shell_script(variable_name, script_path: str) -> str:
     """Get the value of SSH_AUTH_SOCK from a shell script that sets it
 
+    :param variable_name: name of an environment variable set by a shell script
     :param script_path: path to shell script
-    :return: value of SSH_AUTH_SOCK set by shell script
+    :return: value of variable as set by the shell script
     """
 
     # Per the subprocess documentation, "On POSIX with shell=True, the shell
@@ -187,7 +197,7 @@ def get_ssh_auth_socket(script_path: str) -> str:
     result = subprocess.check_output(
         # "." is the POSIX-compliant version of bash's "source".
         # "echo -n" is not guaranteed by POSIX so we strip the newline instead.
-        ". %s; echo $SSH_AUTH_SOCK" % script_path,
+        ". %s; echo $%s" % (script_path, variable_name),
         shell=True,
     )
 

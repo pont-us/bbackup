@@ -47,7 +47,7 @@ def main():
 
 
 def handle_signal(sig, stack_frame):
-    print(
+    log(
         f"\nBackup interrupted by signal {sig} "
         f"at line {stack_frame.f_code.co_filename}:{stack_frame.f_lineno}!\n"
         f"Exiting."
@@ -94,7 +94,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         # arguments for the subprocess.Popen call, not just for the external
         # command.
 
-        print("Starting backup to " + borg_repo)
+        log("Starting backup to " + borg_repo)
         create_args = dict(
             args=[
                 borg_path,
@@ -118,7 +118,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         )
         create_result = tee(create_args, log_fh)
 
-        print("Pruning repository " + borg_repo)
+        log("Pruning repository " + borg_repo)
         # Prune repository to 7 daily, 4 weekly and 6 monthly archives. NB: the
         # '{hostname}-' prefix limits pruning to this machine's archives.
         prune_args = dict(
@@ -142,7 +142,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         )
         prune_result = tee(prune_args, log_fh)
 
-    print("Rotating logs")
+    log("Rotating logs")
     # logrotate, of course, is not run through tee, since it can hardly log
     # its output to the log that it's currently rotating.
     logrotate_extra_args = ["--debug"] if dry_run else []
@@ -164,14 +164,14 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
         ("Prune", prune_result),
         ("Rotate logs", logrotate_result),
     ]:
-        print(step, end="")
-        print(" finished ", end="")
+        message = step + " finished "
         if returncode == 0:
-            print("successfully")
+            result = "successfully"
         elif returncode == 1:
-            print("with warnings")
+            result = "with warnings"
         else:
-            print("with errors")
+            result = "with errors"
+        log(message + result)
 
     # use highest exit code as global exit code
     return max(create_result, prune_result, logrotate_result)
@@ -226,6 +226,10 @@ def tee(subprocess_args: dict, fh) -> int:
         # for it to complete and give a return code.
         popen.wait()
         return popen.returncode
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
 
 
 if __name__ == "__main__":

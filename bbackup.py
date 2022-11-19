@@ -147,7 +147,12 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool):
     # its output to the log that it's currently rotating.
     logrotate_extra_args = ["--debug"] if dry_run else []
     logrotate_args = dict(
-        args=["logrotate", "--verbose", "--state", "logrotate-state"]
+        args=[
+            global_config.get("logrotate-path", "/usr/sbin/logrotate"),
+            "--verbose",
+            "--state",
+            "logrotate-state",
+        ]
         + logrotate_extra_args
         + ["logrotate.conf"],
         cwd=config_dir,

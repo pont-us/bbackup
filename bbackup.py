@@ -57,14 +57,16 @@ def handle_signal(sig, stack_frame):
 
 def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     exclude_file = config_dir.parent.joinpath("exclude.txt")
-    global_config = read_config(config_dir.parent.joinpath("config.yaml"))
-    repo_config = read_config(config_dir.joinpath("config.yaml"))
-    borg_repo = repo_config["repo-path"]
-    borg_path = repo_config.get("borg-path", "borg")
+    # Config is merged from global and subdirectory configs (with the
+    # latter taking precedence in any conflict).
+    config = read_config(config_dir.parent.joinpath("config.yaml"))
+    config.update(read_config(config_dir.joinpath("config.yaml")))
+    borg_repo = config["repo-path"]
+    borg_path = config.get("borg-path", "borg")
 
     extra_params = (
-        ["--remote-path", repo_config["remote-path"]]
-        if "remote-path" in repo_config
+        ["--remote-path", config["remote-path"]]
+        if "remote-path" in config
         else []
     ) + (["--dry-run"] if dry_run else [])
     log_file = config_dir.joinpath("logs", "log")
@@ -75,17 +77,17 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         ),
         BORG_RELOCATED_REPO_ACCESS_IS_OK="yes",
     )
-    if "variable-setter-script-path" in global_config:
+    if "variable-setter-script-path" in config:
         for variable_name in "SSH_AUTH_SOCK", "DBUS_SESSION_BUS_ADDRESS":
             borg_env[variable_name] = get_variable_from_shell_script(
                 variable_name,
                 os.path.expandvars(
                     os.path.expanduser(
-                        global_config["variable-setter-script-path"]
+                        config["variable-setter-script-path"]
                     )
                 ),
             )
-    source_dirs = repo_config.get(
+    source_dirs = config.get(
         "source-directories", [pathlib.Path.home().as_posix()]
     )
 
@@ -148,7 +150,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     logrotate_extra_args = ["--debug"] if dry_run else []
     logrotate_args = dict(
         args=[
-            global_config.get("logrotate-path", "/usr/sbin/logrotate"),
+            config.get("logrotate-path", "/usr/sbin/logrotate"),
             "--verbose",
             "--state",
             "logrotate-state",

@@ -27,7 +27,7 @@ import subprocess
 import sys
 from typing import AnyStr
 import signal
-
+import json
 import yaml
 
 
@@ -64,6 +64,22 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     borg_repo = config["repo-path"]
     borg_path = config.get("borg-path", "borg")
 
+    if "mac-whitelist" in config:
+        allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
+        router_mac = get_router_mac_address()
+        if router_mac in allowed_macs:
+            log(
+                "Router MAC %s in whitelist – proceeding with backup."
+                % router_mac
+            )
+        else:
+            log(
+                "Router MAC %s not in whitelist – aborting backup."
+                % router_mac
+            )
+            # Exit code 0 because it's correct behaviour, not an error.
+            return 0
+
     extra_params = (
         ["--remote-path", config["remote-path"]]
         if "remote-path" in config
@@ -82,9 +98,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
             borg_env[variable_name] = get_variable_from_shell_script(
                 variable_name,
                 os.path.expandvars(
-                    os.path.expanduser(
-                        config["variable-setter-script-path"]
-                    )
+                    os.path.expanduser(config["variable-setter-script-path"])
                 ),
             )
     source_dirs = config.get(
@@ -182,7 +196,9 @@ def read_config(config_dir: pathlib.Path) -> dict:
         return {}
 
 
-def get_variable_from_shell_script(variable_name: str, script_path: str) -> str:
+def get_variable_from_shell_script(
+    variable_name: str, script_path: str
+) -> str:
     """Get the value of SSH_AUTH_SOCK from a shell script that sets it
 
     :param variable_name: name of an environment variable set by a shell script
@@ -221,6 +237,30 @@ def tee(subprocess_args: dict, fh) -> int:
         # for it to complete and give a return code.
         popen.wait()
         return popen.returncode
+
+
+def get_router_mac_address() -> str:
+    route_process = subprocess.run(
+        ["ip", "--json", "route", "list"], capture_output=True
+    )
+    routes = json.loads(route_process.stdout.decode())
+    gateway_ips = [
+        route["gateway"] for route in routes if route["dst"] == "default"
+    ]
+    assert len(gateway_ips) == 1
+    gateway_ip = gateway_ips[0]
+    subprocess.run(["ping", "-c", "1", gateway_ip], capture_output=True)
+    neighbour_process = subprocess.run(
+        ["ip", "--json", "neigh"], capture_output=True
+    )
+    neighbours = json.loads(neighbour_process.stdout.decode())
+    gateway_macs = [
+        neighbour["lladdr"]
+        for neighbour in neighbours
+        if neighbour["dst"] == gateway_ip
+    ]
+    assert len(gateway_macs) == 1
+    return gateway_macs[0].lower()
 
 
 def log(message: str) -> None:

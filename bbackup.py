@@ -25,7 +25,7 @@ import os
 import pathlib
 import subprocess
 import sys
-from typing import AnyStr
+from typing import AnyStr, List
 import signal
 import json
 import yaml
@@ -261,6 +261,19 @@ def get_router_mac_address() -> str:
     ]
     assert len(gateway_macs) == 1
     return gateway_macs[0].lower()
+
+
+def find_big_files(root: str, threshold: int) -> List[str]:
+    # Intended for an "exclude big files" option, but not yet in use.
+    result = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            if os.path.isfile(path):
+                size = os.path.getsize(path)
+                if size > threshold:
+                    result.append(path)
+    return result
 
 
 def log(message: str) -> None:

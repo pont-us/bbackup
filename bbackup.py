@@ -122,7 +122,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
                 "--stats",
                 "--show-rc",
                 "--compression",
-                "auto,zstd",
+                "auto,zstd,19",
                 "--exclude-caches",
                 "--exclude-from",
                 exclude_file,

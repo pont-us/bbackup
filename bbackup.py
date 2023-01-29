@@ -25,7 +25,7 @@ import os
 import pathlib
 import subprocess
 import sys
-from typing import AnyStr, List
+from typing import AnyStr, List, Tuple
 import signal
 import json
 import yaml
@@ -199,7 +199,9 @@ def read_config(config_dir: pathlib.Path) -> dict:
 def get_variable_from_shell_script(
     variable_name: str, script_path: str
 ) -> str:
-    """Get the value of SSH_AUTH_SOCK from a shell script that sets it
+    """Get the value of a variable from a shell script that sets it
+
+    The value is extracted by running the shell script in a child process.
 
     :param variable_name: name of an environment variable set by a shell script
     :param script_path: path to shell script
@@ -274,6 +276,11 @@ def find_big_files(root: str, threshold: int) -> List[str]:
                 if size > threshold:
                     result.append(path)
     return result
+
+
+def get_borg_version(borg_path: str) -> Tuple[int]:
+    output = subprocess.check_output([borg_path, "--version"])
+    return tuple(map(int, output.decode().split(" ")[1].split(".")))
 
 
 def log(message: str) -> None:

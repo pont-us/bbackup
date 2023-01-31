@@ -158,6 +158,15 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         )
         prune_result = tee(prune_args, log_fh)
 
+        borg_version = get_borg_version(borg_path)
+        do_compaction = config.get("compact", borg_version >= (1, 2, 0))
+        if do_compaction:
+            log("Compacting repository " + borg_repo)
+            compact_result = tee(dict(
+                args=[borg_path, "--verbose", "compact", borg_repo]),
+                log_fh
+            )
+
     log("Rotating logs")
     # logrotate, of course, is not run through tee, since it can hardly log
     # its output to the log that it's currently rotating.
@@ -178,6 +187,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     for step, returncode in [
         ("Backup", create_result),
         ("Prune", prune_result),
+        ("Compact", compact_result),
         ("Rotate logs", logrotate_result),
     ]:
         log("%s finished with return code %d." % (step, returncode))

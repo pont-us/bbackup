@@ -25,7 +25,7 @@ import os
 import pathlib
 import subprocess
 import sys
-from typing import AnyStr, List, Tuple
+from typing import AnyStr, List, Tuple, Optional, BinaryIO
 import signal
 import json
 import yaml
@@ -50,7 +50,8 @@ def handle_signal(sig, stack_frame):
     log(
         f"\nBackup interrupted by signal {sig} "
         f"at line {stack_frame.f_code.co_filename}:{stack_frame.f_lineno}!\n"
-        f"Exiting."
+        f"Exiting.",
+        None,
     )
     sys.exit(2)
 
@@ -61,31 +62,15 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     # latter taking precedence in any conflict).
     config = read_config(config_dir.parent.joinpath("config.yaml"))
     config.update(read_config(config_dir.joinpath("config.yaml")))
+    log_file = config_dir.joinpath("logs", "log")
     borg_repo = config["repo-path"]
     borg_path = config.get("borg-path", "borg")
-
-    if "mac-whitelist" in config:
-        allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
-        router_mac = get_router_mac_address()
-        if router_mac in allowed_macs:
-            log(
-                "Router MAC %s in whitelist – proceeding with backup."
-                % router_mac
-            )
-        else:
-            log(
-                "Router MAC %s not in whitelist – aborting backup."
-                % router_mac
-            )
-            # Exit code 0 because it's correct behaviour, not an error.
-            return 0
 
     extra_params = (
         ["--remote-path", config["remote-path"]]
         if "remote-path" in config
         else []
     ) + (["--dry-run"] if dry_run else [])
-    log_file = config_dir.joinpath("logs", "log")
     borg_env = dict(
         os.environ,
         BORG_PASSCOMMAND=(
@@ -106,11 +91,29 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     )
 
     with open(log_file, "bw") as log_fh:
+        if "mac-whitelist" in config:
+            allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
+            router_mac = get_router_mac_address()
+            if router_mac in allowed_macs:
+                log(
+                    "Router MAC %s in whitelist – proceeding with backup."
+                    % router_mac,
+                    log_fh,
+                )
+            else:
+                log(
+                    "Router MAC %s not in whitelist – aborting backup."
+                    % router_mac,
+                    log_fh,
+                )
+                # Exit code 0 because it's correct behaviour, not an error.
+                return 0
+
         # NB: create_args, prune_args, and logrotate_args below contain
         # arguments for the subprocess.Popen call, not just for the external
         # command.
 
-        log("Starting backup to " + borg_repo)
+        log("Starting backup to " + borg_repo, log_fh)
         create_args = dict(
             args=[
                 borg_path,
@@ -134,7 +137,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         )
         create_result = tee(create_args, log_fh)
 
-        log("Pruning repository " + borg_repo)
+        log("Pruning repository " + borg_repo, log_fh)
         # Prune repository to 7 daily, 4 weekly and 6 monthly archives. NB: the
         # '{hostname}-' prefix limits pruning to this machine's archives.
         prune_args = dict(
@@ -161,13 +164,22 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         borg_version = get_borg_version(borg_path)
         do_compaction = config.get("compact", borg_version >= (1, 2, 0))
         if do_compaction:
-            log("Compacting repository " + borg_repo)
-            compact_result = tee(dict(
-                args=[borg_path, "--verbose", "compact", borg_repo]),
-                log_fh
+            log("Compacting repository " + borg_repo, log_fh)
+            compact_result = tee(
+                dict(args=[borg_path, "--verbose", "compact", borg_repo]),
+                log_fh,
             )
 
-    log("Rotating logs")
+        for step, returncode in [
+            ("Backup", create_result),
+            ("Prune", prune_result),
+            ("Compact", compact_result),
+        ]:
+            log(
+                "%s finished with return code %d." % (step, returncode), log_fh
+            )
+
+    log("Rotating logs", None)
     # logrotate, of course, is not run through tee, since it can hardly log
     # its output to the log that it's currently rotating.
     logrotate_extra_args = ["--debug"] if dry_run else []
@@ -183,14 +195,7 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         cwd=config_dir,
     )
     logrotate_result = subprocess.run(**logrotate_args).returncode
-
-    for step, returncode in [
-        ("Backup", create_result),
-        ("Prune", prune_result),
-        ("Compact", compact_result),
-        ("Rotate logs", logrotate_result),
-    ]:
-        log("%s finished with return code %d." % (step, returncode))
+    log("Rotate logs finished with return code %d." % returncode, None)
 
     # use highest exit code as global exit code
     return max(create_result, prune_result, logrotate_result)
@@ -293,8 +298,10 @@ def get_borg_version(borg_path: str) -> Tuple[int]:
     return tuple(map(int, output.decode().split(" ")[1].split(".")))
 
 
-def log(message: str) -> None:
+def log(message: str, log_fh: Optional[BinaryIO]) -> None:
     print(message, flush=True)
+    log_fh.write((message + "\n").encode())
+    log_fh.flush()
 
 
 if __name__ == "__main__":

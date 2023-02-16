@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2022 Pontus Lurcock (pont -at- talvi.net)
+# Copyright 2022-2023 Pontus Lurcock (pont -at- talvi.net)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -139,14 +139,14 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
 
         log("Pruning repository " + borg_repo, log_fh)
         # Prune repository to 7 daily, 4 weekly and 6 monthly archives. NB: the
-        # '{hostname}-' prefix limits pruning to this machine's archives.
+        # '{hostname}-' glob prefix limits pruning to this machine's archives.
         prune_args = dict(
             args=[
                 borg_path,
                 "prune",
                 "--list",
-                "--prefix",
-                "{hostname}-",  # Important! (See above.)
+                "--glob-archives",
+                "{hostname}-*",  # Important! (See above.)
                 "--show-rc",
                 "--keep-daily",
                 "7",
@@ -300,8 +300,9 @@ def get_borg_version(borg_path: str) -> Tuple[int]:
 
 def log(message: str, log_fh: Optional[BinaryIO]) -> None:
     print(message, flush=True)
-    log_fh.write((message + "\n").encode())
-    log_fh.flush()
+    if log_fh is not None:
+        log_fh.write((message + "\n").encode())
+        log_fh.flush()
 
 
 if __name__ == "__main__":

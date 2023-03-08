@@ -153,7 +153,9 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
                 "--keep-weekly",
                 "4",
                 "--keep-monthly",
-                "6",
+                "12",
+                "--keep-yearly",
+                "1",
             ]
             + extra_params
             + [borg_repo],

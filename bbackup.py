@@ -197,10 +197,21 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         cwd=config_dir,
     )
     logrotate_result = subprocess.run(**logrotate_args).returncode
-    log("Rotate logs finished with return code %d." % returncode, None)
+
+    log("\n", None)
+
+    for step, returncode in [
+        ("Backup", create_result),
+        ("Prune", prune_result),
+        ("Compact", compact_result),
+        ("Rotate logs", logrotate_result),
+    ]:
+        log(
+            "%s finished with return code %d." % (step, returncode), None
+        )
 
     # use highest exit code as global exit code
-    return max(create_result, prune_result, logrotate_result)
+    return max(create_result, prune_result, compact_result, logrotate_result)
 
 
 def read_config(config_dir: pathlib.Path) -> dict:

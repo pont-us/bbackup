@@ -28,10 +28,12 @@ import sys
 from typing import AnyStr, List, Tuple, Optional, BinaryIO
 import signal
 import json
+from datetime import datetime, timedelta
 import yaml
 
 
 def main():
+    log(f"bbackup initializing", None)
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
@@ -91,6 +93,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     )
 
     with open(log_file, "bw") as log_fh:
+        start_time = datetime.now()
+        log(f"Starting backup at {start_time.isoformat()}", log_fh)
         if "mac-whitelist" in config:
             allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
             router_mac = get_router_mac_address()
@@ -180,6 +184,10 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
             log(
                 "%s finished with return code %d." % (step, returncode), log_fh
             )
+        log(
+            f"Backup took {format_timedelta(datetime.now() - start_time)}",
+            log_fh,
+        )
 
     log("Rotating logs", None)
     # logrotate, of course, is not run through tee, since it can hardly log
@@ -199,6 +207,11 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
     logrotate_result = subprocess.run(**logrotate_args).returncode
 
     log("\n", None)
+    log(
+        f"Backup and logrotate took "
+        f"{format_timedelta(datetime.now() - start_time)}",
+        None,
+    )
 
     for step, returncode in [
         ("Backup", create_result),
@@ -206,12 +219,15 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         ("Compact", compact_result),
         ("Rotate logs", logrotate_result),
     ]:
-        log(
-            "%s finished with return code %d." % (step, returncode), None
-        )
+        log("%s finished with return code %d." % (step, returncode), None)
 
     # use highest exit code as global exit code
     return max(create_result, prune_result, compact_result, logrotate_result)
+
+
+def format_timedelta(td: timedelta) -> str:
+    m, s = divmod(td.seconds, 60)
+    return f"{m}m {s}s"
 
 
 def read_config(config_dir: pathlib.Path) -> dict:
@@ -312,7 +328,7 @@ def get_borg_version(borg_path: str) -> Tuple[int]:
 
 
 def log(message: str, log_fh: Optional[BinaryIO]) -> None:
-    print(message, flush=True)
+    print(datetime.now().strftime("%H:%M:%S") + " " + message, flush=True)
     if log_fh is not None:
         log_fh.write((message + "\n").encode())
         log_fh.flush()

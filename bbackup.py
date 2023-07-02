@@ -133,6 +133,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
                 "--exclude-caches",
                 "--exclude-from",
                 exclude_file,
+                "--exclude",
+                log_file  # log file will change during backup, of course!
             ]
             + extra_params
             + [borg_repo + "::{hostname}-{now}"]

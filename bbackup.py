@@ -33,7 +33,15 @@ import yaml
 
 
 def main():
-    log(f"bbackup initializing", None)
+    now = datetime.now()
+    tzi = now.astimezone().tzinfo
+
+    log(
+        f"{tzi.tzname(None)} ({tzi.utcoffset(None)}) "
+        f"{now.strftime('%Y-%m-%d')}",
+        None,
+    )
+    log("bbackup initializing", None)
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
@@ -59,6 +67,13 @@ def handle_signal(sig, stack_frame):
 
 
 def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
+    if not config_dir.is_dir():
+        complaint = (
+            "is not a directory" if config_dir.exists() else "does not exist"
+        )
+        log(f"Configuration path {config_dir} {complaint}. Exiting.", None)
+        sys.exit(1)
+
     exclude_file = config_dir.parent.joinpath("exclude.txt")
     # Config is merged from global and subdirectory configs (with the
     # latter taking precedence in any conflict).
@@ -88,6 +103,12 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
                     os.path.expanduser(config["variable-setter-script-path"])
                 ),
             )
+
+    for log_config_dir in [config_dir.parent, config_dir]:
+        log_config_path = log_config_dir.joinpath("logging.conf")
+        if log_config_path.is_file():
+            borg_env["BORG_LOGGING_CONF"] = log_config_path
+
     source_dirs = config.get(
         "source-directories", [pathlib.Path.home().as_posix()]
     )
@@ -134,7 +155,8 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
                 "--exclude-from",
                 exclude_file,
                 "--exclude",
-                log_file  # log file will change during backup, of course!
+                log_file,  # log file will change during backup, of course!
+                "--show-rc",
             ]
             + extra_params
             + [borg_repo + "::{hostname}-{now}"]

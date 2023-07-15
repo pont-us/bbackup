@@ -33,14 +33,7 @@ import yaml
 
 
 def main():
-    now = datetime.now()
-    tzi = now.astimezone().tzinfo
-
-    log(
-        f"{tzi.tzname(None)} ({tzi.utcoffset(None)}) "
-        f"{now.strftime('%Y-%m-%d')}",
-        None,
-    )
+    log(datetime.now().astimezone().isoformat(), None)
     log("bbackup initializing", None)
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)

@@ -310,7 +310,7 @@ def get_router_mac_address() -> str:
     gateway_ips = [
         route["gateway"] for route in routes if route["dst"] == "default"
     ]
-    assert len(gateway_ips) == 1
+    assert len(set(gateway_ips)) == 1
     gateway_ip = gateway_ips[0]
     subprocess.run(["ping", "-c", "1", gateway_ip], capture_output=True)
     neighbour_process = subprocess.run(
@@ -322,7 +322,7 @@ def get_router_mac_address() -> str:
         for neighbour in neighbours
         if neighbour["dst"] == gateway_ip
     ]
-    assert len(gateway_macs) == 1
+    assert len(set(gateway_macs)) == 1
     return gateway_macs[0].lower()
 
 

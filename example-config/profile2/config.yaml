@@ -1,0 +1,10 @@
+---
+# bbackup configuration for a remote backup
+
+repo-path: ssh://backupserver.example.com/./borg-repo-name
+# source-directories:  # defaults to home directory
+#   - dir1
+#   - dir2
+#   - etc.
+
+borg-path: /usr/local/bin/borg-1-1-8

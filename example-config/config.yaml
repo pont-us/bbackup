@@ -1,0 +1,7 @@
+---
+# Global configuration for the bbackup.py script.
+# Settings from this file can be augmented or overwritten by profile
+# configuration files in subdirectories.
+
+variable-setter-script-path: ~/bin/set-socket-variables
+logrotate-path: /usr/sbin/logrotate

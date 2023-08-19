@@ -1,0 +1,10 @@
+---
+# bbackup configuration for a backup to a local USB drive
+
+repo-path: /media/alice/mybackupdrive/some-borg-repo
+# source-directories:  # defaults to home directory
+#   - dir1
+#   - dir2
+#   - etc.
+
+borg-path: /usr/local/bin/borg-1-2-4

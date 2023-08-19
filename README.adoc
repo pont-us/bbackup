@@ -1,0 +1,54 @@
+= bbackup: a backup script for borg
+
+Copyright 2022–2023 Pontus Lurcock.
+Released under the MIT license.
+
+== Description
+
+bbackup is a Python wrapper script for
+https://borgbackup.readthedocs.io/en/stable/[borg backup].
+It is designed for use on a personal computer (i.e. not always on, and usually
+with one user logged in when it is on). bbackup handles various housekeeping
+tasks that go along with actually performing the backup. bbackup was written
+for Ubuntu 20.04 with the standard GNOME desktop, and has not been tested on
+other systems. I wrote bbackup purely to meet my own needs, but it (or parts
+of it) may also be useful to other borg users.
+
+In a typical run, bbackup will:
+
+* Read a configuration from YAML files in a configuration directory.
+* Read an exclude list from the configuration directory.
+* Use GNOME secret-tool to obtain the borg password for repository access.
+* Run a shell script (expected to be created on X session start-up) to obtain
+  values for the `SSH_AUTH_SOCK` and `DBUS_SESSION_BUS_ADDRESS`
+  variables, to allow passwordless access to remote repositories over SSH.
+* Determine the currently used router's MAC address, check it against a
+  pre-configured whitelist, and abort if it's not whitelisted (to avoid backing
+  up over slow, metered, or untrusted connections).
+* Perform a backup by calling borg with the parameters from the configuration
+  (as well as some currently hard-coded parameters).
+* Prune the borg repository (the prune parameters are currently hard-coded).
+* Compact the borg repository.
+* Tee all borg output to a log file.
+* Archive and rotate log files with logrotate. Currently, log file archives are
+  stored in the configuration directory.
+
+This repository also contains a bash script called `save-sockets-to-file`; it
+is designed to be run on X session start-up, and creates another bash script
+which sets the values of `SSH_AUTH_SOCK` and `DBUS_SESSION_BUS_ADDRESS`.
+This is needed if performing a headless backup over SSH (e.g. with anacron),
+since these variables are only available in the user session.
+
+== Invocation
+
+`bbackup /path/to/<global-config-dir>/<profile-config-dir>`
+
+`<global-config-dir>` is a directory containing a top-level bbackup YAML
+configuration file, an exclude file, and one or more subdirectories containing
+the configuration and log files for a particular profile. This structure
+lets multiple profiles share an exclude file and some configuration settings.
+
+== Configuration
+
+See the directory `example-config` in this repository for a sample
+configuration structure.

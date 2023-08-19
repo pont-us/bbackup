@@ -8,3 +8,7 @@ repo-path: ssh://backupserver.example.com/./borg-repo-name
 #   - etc.
 
 borg-path: /usr/local/bin/borg-1-1-8
+
+mac-whitelist:
+  - 01:23:45:67:89:0a
+  - 12:34:56:78:90:ab

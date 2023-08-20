@@ -108,7 +108,9 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
 
     with open(log_file, "bw") as log_fh:
         start_time = datetime.now()
-        log(f"Starting backup at {start_time.astimezone().isoformat()}", log_fh)
+        log(
+            f"Starting backup at {start_time.astimezone().isoformat()}", log_fh
+        )
         if "mac-whitelist" in config:
             allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
             router_mac = get_router_mac_address()
@@ -189,7 +191,10 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
         if do_compaction:
             log("Compacting repository " + borg_repo, log_fh)
             compact_result = tee(
-                dict(args=[borg_path, "--verbose", "compact", borg_repo]),
+                dict(
+                    args=[borg_path, "--verbose", "compact", borg_repo],
+                    env=borg_env,
+                ),
                 log_fh,
             )
 

@@ -39,13 +39,23 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
 
     parser = argparse.ArgumentParser("Perform borg backups")
-    parser.add_argument("--dry-run", "-d", action="store_true")
+    parser.add_argument(
+        "--dry-run", "-d",
+        help="Don't do anything, just print what would be done",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--quiet-logrotate",
+        "-l",
+        help="Run logrotate without --verbose option (useful for cronjobs)",
+        action="store_true",
+    )
     parser.add_argument(
         "config_dir", type=str, help="Configuration and log directory"
     )
     args = parser.parse_args()
     config_path = pathlib.Path(args.config_dir)
-    exit_code = do_backup(config_path, args.dry_run)
+    exit_code = do_backup(config_path, args.dry_run, not args.quiet_logrotate)
     sys.exit(exit_code)
 
 
@@ -59,7 +69,9 @@ def handle_signal(sig, stack_frame):
     sys.exit(2)
 
 
-def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
+def do_backup(
+    config_dir: pathlib.Path, dry_run: bool, verbose_logrotate: bool
+) -> int:
     if not config_dir.is_dir():
         complaint = (
             "is not a directory" if config_dir.exists() else "does not exist"
@@ -213,16 +225,14 @@ def do_backup(config_dir: pathlib.Path, dry_run: bool) -> int:
 
     log("Rotating logs", None)
     # logrotate, of course, is not run through tee, since it can hardly log
-    # its output to the log that it's currently rotating.
-    logrotate_extra_args = ["--debug"] if dry_run else []
+    # its output to the log that it's currently rotating. With --verbose,
+    # logrotate sends its verbose output to stderr, which may be misinterpreted
+    # as indication of an error state when running headless (e.g. via cronic).
     logrotate_args = dict(
-        args=[
-            config.get("logrotate-path", "/usr/sbin/logrotate"),
-            "--verbose",
-            "--state",
-            "logrotate-state",
-        ]
-        + logrotate_extra_args
+        args=[config.get("logrotate-path", "/usr/sbin/logrotate")]
+        + (["--verbose"] if verbose_logrotate else [])
+        + ["--state", "logrotate-state"]
+        + (["--debug"] if dry_run else [])
         + ["logrotate.conf"],
         cwd=config_dir,
     )

@@ -3,7 +3,7 @@
 Copyright 2022–2023 Pontus Lurcock.
 Released under the MIT license.
 
-== Description
+== The bbackup script
 
 bbackup is a Python wrapper script for
 https://borgbackup.readthedocs.io/en/stable/[borg backup].
@@ -33,11 +33,17 @@ In a typical run, bbackup will:
 * Archive and rotate log files with logrotate. Currently, log file archives are
   stored in the configuration directory.
 
-This repository also contains a bash script called `save-sockets-to-file`; it
-is designed to be run on X session start-up, and creates another bash script
-which sets the values of `SSH_AUTH_SOCK` and `DBUS_SESSION_BUS_ADDRESS`.
-This is needed if performing a headless backup over SSH (e.g. with anacron),
-since these variables are only available in the user session.
+== Other scripts in this repository
+
+`save-sockets-to-file` is a bash script designed to be run on X session
+start-up. It creates another bash script which sets the values of
+`SSH_AUTH_SOCK` and `DBUS_SESSION_BUS_ADDRESS`. This is needed if
+performing a headless backup over SSH (e.g. with anacron), since these
+variables are only available in the user session.
+
+`plotborg.py` shows a simple graphical representation of the time points
+of archives listed by `borg list`, which can be useful when reviewing the
+contents of a borg repository.
 
 == Invocation
 

@@ -8,9 +8,12 @@ the archives in a borg repository.
 """
 
 import sys
+from datetime import datetime
+
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 
 """Plot archive datestamps from `borg list` output"""
 
@@ -21,7 +24,7 @@ def main():
         header=None,
         parse_dates=[1]
     )
-    plt.figure(figsize=(1, 10))
+    plt.figure(figsize=(3, 12))
     plt.yticks(ticks=df[1], labels=make_labels(df[1]))
     plt.xticks(ticks=[], labels=[])
     plt.hlines(df[1], 0, 1)

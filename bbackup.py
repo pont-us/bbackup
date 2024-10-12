@@ -125,7 +125,7 @@ def do_backup(
         )
         if "mac-whitelist" in config:
             allowed_macs = map(lambda x: x.lower(), config["mac-whitelist"])
-            router_mac = get_router_mac_address()
+            router_mac = get_router_mac_address(log_fh)
             if router_mac in allowed_macs:
                 log(
                     "Router MAC %s in whitelist – proceeding with backup."
@@ -287,7 +287,6 @@ def get_variable_from_shell_script(
     # Per the subprocess documentation, "On POSIX with shell=True, the shell
     # defaults to /bin/sh". But even if this changes, any POSIX-compliant shell
     # should work here.
-
     result = subprocess.check_output(
         # "." is the POSIX-compliant version of bash's "source".
         # "echo -n" is not guaranteed by POSIX so we strip the newline instead.
@@ -317,7 +316,7 @@ def tee(subprocess_args: dict, fh) -> int:
         return popen.returncode
 
 
-def get_router_mac_address() -> str:
+def get_router_mac_address(log_fh: Optional[BinaryIO]) -> str:
     route_process = subprocess.run(
         ["ip", "--json", "route", "list"], capture_output=True
     )
@@ -325,7 +324,13 @@ def get_router_mac_address() -> str:
     gateway_ips = [
         route["gateway"] for route in routes if route["dst"] == "default"
     ]
-    assert len(set(gateway_ips)) == 1
+    n_distinct_ips = len(set(gateway_ips))
+    if n_distinct_ips == 0:
+        log("No gateway IP. Aborting.", log_fh)
+        raise RuntimeError("No gateway IP")
+    elif n_distinct_ips > 1:
+        log(f"Multiple gateway IPs ({gateway_ips}). Aborting.", log_fh)
+        raise RuntimeError("Multiple gateway IPs")
     gateway_ip = gateway_ips[0]
     subprocess.run(["ping", "-c", "1", gateway_ip], capture_output=True)
     neighbour_process = subprocess.run(
@@ -337,7 +342,13 @@ def get_router_mac_address() -> str:
         for neighbour in neighbours
         if neighbour["dst"] == gateway_ip
     ]
-    assert len(set(gateway_macs)) == 1
+    n_distinct_macs = len(set(gateway_macs))
+    if n_distinct_macs == 0:
+        log("No gateway MAC. Aborting.", log_fh)
+        raise RuntimeError("No gateway MAC")
+    elif n_distinct_macs > 1:
+        log(f"Multiple gateway MACs ({gateway_macs}). Aborting.", log_fh)
+        raise RuntimeError("Multiple gateway MACs")
     return gateway_macs[0].lower()
 
 
@@ -354,7 +365,7 @@ def find_big_files(root: str, threshold: int) -> List[str]:
     return result
 
 
-def get_borg_version(borg_path: str) -> Tuple[int]:
+def get_borg_version(borg_path: str) -> Tuple[int, ...]:
     output = subprocess.check_output([borg_path, "--version"])
     return tuple(map(int, output.decode().split(" ")[1].split(".")))
 

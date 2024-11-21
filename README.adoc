@@ -1,6 +1,6 @@
 = bbackup: a backup script for borg
 
-Copyright 2022–2023 Pontus Lurcock.
+Copyright 2022–2024 Pontus Lurcock.
 Released under the MIT license.
 
 == The bbackup script

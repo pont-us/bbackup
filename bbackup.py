@@ -190,7 +190,7 @@ def do_backup(
                 "--keep-monthly",
                 "12",
                 "--keep-yearly",
-                "1",
+                "3",
             ]
             + extra_params
             + [borg_repo],
